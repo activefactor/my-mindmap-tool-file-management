@@ -1,126 +1,93 @@
-# Mindmap Tool
+# Mindmap Tool（サーバー版・Phase 2 開発中）
 
-[![Open App](https://img.shields.io/badge/Open%20App-GitHub%20Pages-blue?style=for-the-badge)](https://activefactor.github.io/my-mindmap-tool/)
+ブラウザで動くマインドマップ作成ツールです。
 
-ブラウザで動くマインドマップ作成ツールです。インストール不要・サーバー不要で、すぐに使えます。
-
----
-
-## 主な機能
-
-- ノードの追加・編集・削除
-- ドラッグ＆ドロップで親子関係の変更
-- ノードの折りたたみ（サブツリーを隠す）
-- 全体表示（フィットビュー）
-- 元に戻す / やり直し（無制限）
-- PNG / PDF エクスポート
-- JSON / テキスト形式での保存・読み込み
-- 自動保存（ブラウザのローカルストレージ）
-- キーボードショートカット
+社内情報共有向けに、まずサーバーレス版（Phase 1）として開発し、現在はレンタルサーバー
+（[heteml](https://www.heteml.jp/)）上で動作する **サーバー版（Phase 2）** への移行を進めています。
+Phase 2 では SSO ログイン（Google / Microsoft）・ダッシュボード・フォルダ管理・サーバー保存
+などを追加します。
 
 ---
 
-## 使い方
+## フロントエンドの操作方法・仕様
 
-### 起動
+ノード操作・キーボードショートカット・ファイル形式（JSON／インデントテキスト）など、
+マインドマップ編集そのものの操作方法はサーバーレス版と共通です。詳細な操作方法は
+サーバーレス版リポジトリの README を参照してください。
+
+- サーバーレス版リポジトリ: https://github.com/activefactor/my-mindmap-tool
+- 公開デモ（サーバーレス版）: https://activefactor.github.io/my-mindmap-tool/
+
+> 本リポジトリ（サーバー版）は GitHub Pages では公開しません（認証・DB を伴うため、
+> レンタルサーバー上にデプロイして運用します）。
+
+---
+
+## このリポジトリの構成
+
+```
+my-mindmap-tool-file-management/
+├── mindmap-tool/   # フロントエンド（React + Vite。サーバーレス版と同一コードベースを拡張）
+├── server/         # バックエンド（PHP + MySQL、Phase 2 で追加。設計は docs/基本設計書_Phase2.md）
+└── docs/           # ドキュメント一式（要件定義書・基本設計書・開発標準ルール・セキュリティポリシー・デザイン定義）
+```
+
+---
+
+## セットアップ・起動方法
+
+### フロントエンド（`mindmap-tool/`）
 
 ```bash
+cd mindmap-tool
 npm install
 npm run dev
 ```
 
-ブラウザで `http://localhost:5173` を開きます。
+`http://localhost:5173` を開きます。ビルドする場合は `npm run build`（`dist/` に出力）。
 
-### ビルド（静的ファイルとして配布する場合）
+### バックエンド（`server/`）— 現在設計段階
 
-```bash
-npm run build
-```
+Phase 2 のバックエンド（PHP + MySQL、SSO認証）は設計完了・実装着手前の段階です。
+詳細な構成・DBスキーマ・APIは [docs/基本設計書_Phase2.md](docs/基本設計書_Phase2.md) を参照してください。
 
-`dist/` フォルダに静的ファイルが出力されます。
-
----
-
-## 操作方法
-
-### ノードの操作
-
-| 操作 | 方法 |
-|------|------|
-| ノードを選択 | クリック |
-| ノードを編集 | ダブルクリック、または `F2` |
-| 編集を確定 | `Enter` |
-| 改行を挿入（編集中） | `Shift+Enter` |
-| 編集をキャンセル | `Escape` |
-| 子ノードを追加 | `Tab` キー |
-| 兄弟ノードを追加 | `Enter`（編集中でないとき） |
-| ノードを削除 | `Delete` / `Backspace` |
-| 親子関係を変更 | ノードをドラッグして別のノードへ移動 |
-| サブツリーを折りたたむ / 展開 | ノード右端の小さな丸をクリック（子ノードがあるとき表示。折りたたみ時は白抜きの丸になる） |
-| 共有用にコピー | `Ctrl+C` / `Cmd+C`（子孫ノードも含めてインデントテキストでコピー） |
-| アプリ用にコピー | `Ctrl+Shift+C` / `Cmd+Shift+C`（改行や構造を保ったJSONでコピー） |
-| カット | `Ctrl+X` / `Cmd+X`（アプリ用形式でコピー後にノードを削除） |
-| 貼り付け | `Ctrl+V` / `Cmd+V`（アプリ用形式を優先し、テキスト形式にも対応） |
-
-### 右クリックメニュー
-
-ノードを右クリックすると、子ノード追加・編集・削除などのメニューが表示されます。
-
-### キーボードショートカット
-
-| ショートカット | 機能 |
-|--------------|------|
-| `Tab` | 子ノードを追加 |
-| `Enter` | 兄弟ノードを追加 |
-| `F2` | 選択ノードを編集 |
-| `Shift+Enter`（編集中） | 改行を挿入 |
-| `Delete` / `Backspace` | 選択ノードを削除 |
-| `Ctrl+Z` / `Cmd+Z` | 元に戻す |
-| `Ctrl+Shift+Z` / `Cmd+Shift+Z` | やり直し |
-| `Ctrl+C` / `Cmd+C` | 選択ノードを共有用テキストとしてコピー |
-| `Ctrl+Shift+C` / `Cmd+Shift+C` | 選択ノードをアプリ用JSONとしてコピー |
-| `Ctrl+X` / `Cmd+X` | 選択ノードをカット（アプリ用JSONでコピー＋削除） |
-| `Ctrl+V` / `Cmd+V` | クリップボードを選択ノードの子として貼り付け（JSON優先、テキストfallback） |
-| `F` | 全体表示（フィットビュー） |
-
-### ツールバー
-
-| ボタン | 機能 |
-|--------|------|
-| 新規 | マップを初期化して新規作成 |
-| 開く | JSON または テキストファイルを読み込む |
-| 保存 | JSON または テキストファイルとしてダウンロード |
-| エクスポート | PNG または PDF として書き出し |
-| 全体表示 | 全ノードが画面に収まるようにズームを調整 |
+- 本番環境はレンタルサーバー（heteml）上にデプロイします。
+- DB接続情報・SSOクライアントシークレット等の機密情報は `.env` で管理し、Git にはコミットしません。
+  リポジトリには `.env.example` にダミー値のサンプルを用意します（`server/` 追加時に整備）。
+- ローカル開発は Docker 等の仮想環境で heteml 相当の PHP/MySQL 環境を再現する予定です
+  （実装ステップは [docs/開発ステップ_Phase2.md](docs/開発ステップ_Phase2.md) の Step 1 を参照）。
 
 ---
 
-## ファイル形式
+## ドキュメント
 
-### JSON形式（`.json`）
+| ドキュメント | 内容 |
+|------------|------|
+| [docs/要件定義書.md](docs/要件定義書.md) | 全フェーズの機能要件・非機能要件 |
+| [docs/基本設計書_Phase1.md](docs/基本設計書_Phase1.md) | Phase 1（サーバーレス版）の設計 |
+| [docs/基本設計書_Phase2.md](docs/基本設計書_Phase2.md) | Phase 2（heteml サーバー版）の設計 |
+| [docs/開発ステップ_Phase2.md](docs/開発ステップ_Phase2.md) | Phase 2 の実装ステップ・チェックリスト |
+| [docs/開発標準ルール.md](docs/開発標準ルール.md) | コーディング規約・Git運用・devlog/ADRフォーマット |
+| [docs/セキュリティポリシー.md](docs/セキュリティポリシー.md) | 脅威モデル・XSS/CSP・認証等のセキュリティ規約 |
+| [docs/DESIGN.md](docs/DESIGN.md) | UIデザイントークン（Single Source of Truth） |
 
-ツリー構造をそのまま保存します。再読み込みして編集を続けられます。
-
-### テキスト形式（`.txt`）
-
-インデントで階層を表現したプレーンテキストです。
-ノード内の改行は `\n` として保存され、読み込み時に改行へ戻ります。
-
-```
-メインテーマ
-    トピック1
-        サブトピック1-1\n補足メモ
-        サブトピック1-2
-    トピック2
-```
+開発ログ・アーキテクチャ決定記録・プロンプトログは `mindmap-tool/docs/devlog/` /
+`mindmap-tool/docs/adr/` / `mindmap-tool/docs/promptlog/` にあります。
 
 ---
 
 ## 技術スタック
 
-- [React 19](https://react.dev/)
-- [TypeScript](https://www.typescriptlang.org/)
-- [Vite](https://vite.dev/)
-- [React Flow v11](https://reactflow.dev/)
-- [html-to-image](https://github.com/bubkoo/html-to-image)
-- [jsPDF](https://github.com/parallax/jsPDF)
+### フロントエンド
+
+- [React 19](https://react.dev/) / [TypeScript](https://www.typescriptlang.org/) / [Vite](https://vite.dev/)
+- [React Flow v11](https://reactflow.dev/)（マインドマップ描画）
+- [html-to-image](https://github.com/bubkoo/html-to-image) / [jsPDF](https://github.com/parallax/jsPDF)（PNG/PDF出力）
+
+### バックエンド（Phase 2、設計中）
+
+- PHP 8.x（Composer）/ MySQL
+- OAuth 2.0 / OIDC（Google, Microsoft）
+- ホスティング: heteml
+
+詳細は [docs/基本設計書_Phase2.md](docs/基本設計書_Phase2.md) §8 を参照してください。
