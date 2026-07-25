@@ -71,8 +71,12 @@ Phase 2 のバックエンド（PHP + MySQL、SSO認証）は設計完了・実�
 | [docs/セキュリティポリシー.md](docs/セキュリティポリシー.md) | 脅威モデル・XSS/CSP・認証等のセキュリティ規約 |
 | [docs/DESIGN.md](docs/DESIGN.md) | UIデザイントークン（Single Source of Truth） |
 
-開発ログ・アーキテクチャ決定記録・プロンプトログは `mindmap-tool/docs/devlog/` /
-`mindmap-tool/docs/adr/` / `mindmap-tool/docs/promptlog/` にあります。
+開発ログ・プロンプトログ・アーキテクチャ決定記録は以下にあります。
+
+- `docs/devlog/` / `docs/promptlog/` — 要件・設計・レビュー対応など、コードに紐付かない
+  プロジェクト全体の記録
+- `mindmap-tool/docs/devlog/` / `mindmap-tool/docs/adr/` — フロントエンドのコード変更に
+  関する記録
 
 ---
 

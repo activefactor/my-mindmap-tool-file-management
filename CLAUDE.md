@@ -17,13 +17,29 @@ my-mindmap-tool-file-management/
 │   ├── 開発ステップ_Phase2.md   # Phase 2 の実装ステップ・チェックリスト
 │   ├── 開発標準ルール.md         # コーディング規約・Git運用・devlog/ADRフォーマット
 │   ├── セキュリティポリシー.md    # 脅威モデル・XSS/CSP/認証等のセキュリティ規約
-│   └── DESIGN.md               # UIデザイントークン（Single Source of Truth）
-└── mindmap-tool/               # アプリ本体（React + Vite、Phase 1 コードベース）
-    └── docs/
-        ├── adr/                # アーキテクチャ決定記録
-        ├── devlog/             # 開発ログ
-        └── promptlog/          # プロンプトログ（ユーザー指示の記録）
+│   ├── DESIGN.md               # UIデザイントークン（Single Source of Truth）
+│   ├── devlog/                 # 開発ログ（プロジェクト全体・計画レベル）
+│   └── promptlog/              # プロンプトログ（ユーザー指示の記録。常にここ一箇所）
+├── mindmap-tool/               # フロントエンド（React + Vite、Phase 1 コードベース）
+│   └── docs/
+│       ├── adr/                # アーキテクチャ決定記録（mindmap-tool 固有）
+│       └── devlog/             # 開発ログ（mindmap-tool のコード変更に関するもの）
+└── server/                     # バックエンド（PHP。Phase 2 で追加、現時点は未着手）
+    └── docs/                    # 追加時に adr/devlog を同様に設ける想定
 ```
+
+**devlog/ADR の置き場所の使い分け**（2026-07-25 に整理）:
+
+- `docs/devlog/` — 要件・設計・レビュー対応・git運用など、特定のコンポーネントのコードに
+  紐付かない、プロジェクト全体・計画レベルの記録。
+- `mindmap-tool/docs/devlog/` `mindmap-tool/docs/adr/` — mindmap-tool のフロントエンドコードを
+  実際に変更したときの記録（Phase 1 の実装ログはすべてここにある）。
+- `server/docs/devlog/` `server/docs/adr/` — server/ のバックエンドコードを実際に変更したときの
+  記録（`server/` 追加時に同様の構成で新設する）。
+- `docs/promptlog/` — ユーザーからの指示の記録は、対象コードの場所によらず常にここ一箇所に置く。
+- 判断基準: 「このセッションでコードを書いたか」で振り分ける。書いていなければ
+  （要件定義・設計・レビュー対応・git操作等）`docs/devlog/`、書いていれば書いたコード側の
+  `docs/devlog/`。
 
 Phase 2（レンタルサーバー heteml への移行）のバックエンドコード（PHP）は `server/` ディレクトリに
 配置する（`docs/基本設計書_Phase2.md` §7 参照）。「開発ステップ作成」フェーズで実際に着手する。
@@ -37,12 +53,15 @@ Phase 2（レンタルサーバー heteml への移行）のバックエンド�
 
 - **ドキュメント同期必須**: 機能追加・仕様変更・技術選定を行った場合、同じコミット/PRで
   `docs/要件定義書.md` / `docs/基本設計書_PhaseX.md` / devlog を更新する（`docs/開発標準ルール.md` §5）。
-- **devlog 必須**: 新機能実装・技術選定・バグ修正・仕様解釈の判断を行ったら
-  `mindmap-tool/docs/devlog/YYYYMMDD_タイトル.md` に記録する（フォーマットは `docs/開発標準ルール.md` §6）。
-- **ADR**: アーキテクチャレベルの意思決定（ライブラリ選定、認証方式、DB設計等）は
-  `mindmap-tool/docs/adr/YYYYMMDD_タイトル.md` に記録する（`docs/開発標準ルール.md` §7）。
-- **プロンプトログ**: ユーザーからの主要な指示・要求は `mindmap-tool/docs/promptlog/YYYYMMDD_内容.md` に
-  記録する（フォーマットは後述）。
+- **devlog 必須**: 新機能実装・技術選定・バグ修正・仕様解釈の判断・要件/設計の変更を行ったら
+  devlogに記録する（フォーマットは `docs/開発標準ルール.md` §6）。コードを変更した場合は
+  そのコードが属するディレクトリの `docs/devlog/`（例: `mindmap-tool/docs/devlog/`,
+  `server/docs/devlog/`）、コードを伴わない要件・設計・計画作業の場合はルート直下の
+  `docs/devlog/` に置く。
+- **ADR**: アーキテクチャレベルの意思決定（ライブラリ選定、認証方式、DB設計等）は、対応する
+  コードのディレクトリの `docs/adr/YYYYMMDD_タイトル.md` に記録する（`docs/開発標準ルール.md` §7）。
+- **プロンプトログ**: ユーザーからの主要な指示・要求は、常にルート直下の
+  `docs/promptlog/YYYYMMDD_内容.md` に記録する（コンポーネント別に分けない。フォーマットは後述）。
 - **DESIGN.md 準拠**: 色・spacing・font-size をコンポーネントにハードコードしない。必ず
   `docs/DESIGN.md` 定義の CSS カスタムプロパティを使う。
 - **XSS対策**: `dangerouslySetInnerHTML` / `innerHTML` への文字列代入禁止（`docs/セキュリティポリシー.md` §3.1）。
@@ -57,7 +76,7 @@ Phase 2（レンタルサーバー heteml への移行）のバックエンド�
 - **Phase 1**（サーバーレス・認証なし）: 承認済み・リリース済み（GitHub Pages）。
 - **Phase 2**（heteml サーバー移行・SSO・ダッシュボード・フォルダ管理・保存方式変更）:
   `docs/要件定義書.md` v2.1 承認済み。`docs/基本設計書_Phase2.md` v2.0 作成済み（外部レビュー
-  `mindmap-tool/docs/基本設計書_Phase2_レビュー報告書_20260725.md` の指摘を反映済み）。
+  `docs/基本設計書_Phase2_レビュー報告書_20260725.md` の指摘を反映済み）。
   `docs/開発ステップ_Phase2.md` v1.0 作成済み（Step 0〜12）。次は「構築」（Step 0 の
   heteml実機確認から着手）。
   - ホスティング: heteml（契約済み、SSH接続・Composer利用可能な上位プラン）
@@ -72,7 +91,7 @@ Phase 2（レンタルサーバー heteml への移行）のバックエンド�
 
 ## プロンプトログのフォーマット
 
-`mindmap-tool/docs/promptlog/YYYYMMDD_内容.md`
+`docs/promptlog/YYYYMMDD_内容.md`（ルート直下、常にここ一箇所）
 
 ```markdown
 # プロンプトログ: [タイトル]
