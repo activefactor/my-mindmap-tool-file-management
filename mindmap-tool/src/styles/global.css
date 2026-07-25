@@ -1,0 +1,41 @@
+@import './tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-base);
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-canvas);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* React Flow のデフォルトスタイルを上書き */
+.react-flow__node {
+  font-family: var(--font-family-base);
+}
+
+.react-flow__edge .react-flow__edge-path {
+  stroke: var(--color-edge);
+  stroke-width: 3;
+}
+
+.react-flow__edge.selected .react-flow__edge-path,
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: var(--color-edge-hover);
+  stroke-width: 3;
+}
+
+/* キャンバスのドットグリッド */
+.react-flow__background {
+  background-color: var(--color-bg-canvas);
+}
