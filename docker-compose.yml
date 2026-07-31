@@ -1,0 +1,29 @@
+services:
+  php:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    volumes:
+      - ./server:/var/www/html
+    env_file:
+      - ./server/.env
+    depends_on:
+      - mysql
+
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: mindmap
+      MYSQL_USER: mindmap
+      MYSQL_PASSWORD: mindmap
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+volumes:
+  mysql_data:

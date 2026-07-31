@@ -24,8 +24,12 @@ my-mindmap-tool-file-management/
 │   └── docs/
 │       ├── adr/                # アーキテクチャ決定記録（mindmap-tool 固有）
 │       └── devlog/             # 開発ログ（mindmap-tool のコード変更に関するもの）
-└── server/                     # バックエンド（PHP。Phase 2 で追加、現時点は未着手）
-    └── docs/                    # 追加時に adr/devlog を同様に設ける想定
+└── server/                     # バックエンド（PHP 8.5 CGI版 + MySQL 8.4。Step 1 で着手）
+    ├── public/api/index.php     # フロントコントローラ（現状はヘルスチェックのみ）
+    ├── Dockerfile / composer.json / .env.example
+    └── docs/
+        ├── adr/                 # アーキテクチャ決定記録（server 固有）
+        └── devlog/              # 開発ログ（server のコード変更に関するもの）
 ```
 
 **devlog/ADR の置き場所の使い分け**（2026-07-25 に整理）:
@@ -42,7 +46,7 @@ my-mindmap-tool-file-management/
   `docs/devlog/`。
 
 Phase 2（レンタルサーバー heteml への移行）のバックエンドコード（PHP）は `server/` ディレクトリに
-配置する（`docs/基本設計書_Phase2.md` §7 参照）。「開発ステップ作成」フェーズで実際に着手する。
+配置する（`docs/基本設計書_Phase2.md` §7 参照）。「構築」フェーズの Step 1 で着手済み。
 
 ## 進め方（このプロジェクトの開発フロー）
 
@@ -71,21 +75,23 @@ Phase 2（レンタルサーバー heteml への移行）のバックエンド�
 - **`any` 型禁止**（やむを得ない場合は `// TODO: 型定義` を付す）。
 - コミットメッセージは Conventional Commits（`docs/開発標準ルール.md` §4.2）。
 
-## Phase 状況（2026-07-25 時点）
+## Phase 状況（2026-07-31 時点）
 
 - **Phase 1**（サーバーレス・認証なし）: 承認済み・リリース済み（GitHub Pages）。
 - **Phase 2**（heteml サーバー移行・SSO・ダッシュボード・フォルダ管理・保存方式変更）:
-  `docs/要件定義書.md` v2.1 承認済み。`docs/基本設計書_Phase2.md` v2.0 作成済み（外部レビュー
-  `docs/基本設計書_Phase2_レビュー報告書_20260725.md` の指摘を反映済み）。
-  `docs/開発ステップ_Phase2.md` v1.0 作成済み（Step 0〜12）。次は「構築」（Step 0 の
-  heteml実機確認から着手）。
-  - ホスティング: heteml（契約済み、SSH接続・Composer利用可能な上位プラン）
-  - バックエンド: PHP + MySQL（DBスキーマ・APIエンドポイントは `docs/基本設計書_Phase2.md` §5 参照）
-  - 認証: Google / Microsoft SSO（Microsoft は職場・学校・個人アカウント両方、`common`エンドポイント）+ 許可ドメイン／許可アドレスによるアクセス制御。プロバイダ間のメール自動統合は行わない（`docs/基本設計書_Phase2.md` §3.1）
-  - セッションCookie: `SameSite=Lax` + CSRFトークン検証（`SameSite=Strict` は OAuth コールバックと矛盾するため不採用）
-  - マップ削除: ソフトデリート（ゴミ箱・復元・保持期間後の完全削除、FR-14）
-  - ローカル開発: Docker等の仮想環境で heteml 相当の PHP/MySQL 環境を再現する想定（構築フェーズで整備）
-  - 未決定事項: `docs/基本設計書_Phase2.md` §12 参照（Microsoft OAuthライブラリ、ルーティングライブラリ、heteml実機のディレクトリ構成・PHP/MySQLバージョン確認、容量上限の具体値、バックアップRPO/RTO等）
+  `docs/要件定義書.md` v2.1 承認済み。`docs/基本設計書_Phase2.md` v2.2、
+  `docs/開発ステップ_Phase2.md` v1.2。「構築」フェーズ実施中。
+  - **確定した実機情報**（2026-07-31）: ドメイン `mindmap.activefactor.org`、公開パス
+    `/web/activefactor.org/mindmap/`、PHP 8.5（CGI版）、MySQL 8.4
+  - **Step 0**（前提確認）: 完了。
+  - **Step 1**（ローカルDocker環境構築）: 完了・検証済み（2026-07-31）。
+    `docker compose up -d --build` でヘルスチェック（200 OK）、PHP拡張5種
+    （curl/openssl/zip/pdo_mysql/mbstring）、`composer install`、MySQL 8.4 接続を確認済み。
+    Google/Microsoft開発者コンソールへのリダイレクトURI登録のみ Step 3 までに要対応。
+  - 次: Step 2（DBスキーマ実装）以降は `docs/基本設計書_Phase2.md` §12 の未決定事項
+    （Microsoft OAuthライブラリ、ルーティングライブラリ、容量上限の具体値、バックアップ
+    RPO/RTO等）を解消しながら進める。
+  - 認証方式・保存方式・セキュリティ設計の詳細は `docs/基本設計書_Phase2.md` を参照。
 - **Phase 3**（AI連携）: 未着手。
 - **Phase 4**（共同編集）: 未着手・将来検討。
 

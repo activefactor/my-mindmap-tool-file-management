@@ -46,16 +46,22 @@ npm run dev
 
 `http://localhost:5173` を開きます。ビルドする場合は `npm run build`（`dist/` に出力）。
 
-### バックエンド（`server/`）— 現在設計段階
+### バックエンド（`server/`）— ローカル環境構築中（Step 1）
 
-Phase 2 のバックエンド（PHP + MySQL、SSO認証）は設計完了・実装着手前の段階です。
-詳細な構成・DBスキーマ・APIは [docs/基本設計書_Phase2.md](docs/基本設計書_Phase2.md) を参照してください。
+Phase 2 のバックエンド（PHP 8.5 + MySQL 8.4、SSO認証）は、Docker によるローカル開発環境の
+構築に着手した段階です（認証・保存API等は未実装。疎通確認用のヘルスチェックのみ）。
+詳細な構成・DBスキーマ・APIは [docs/基本設計書_Phase2.md](docs/基本設計書_Phase2.md) を、
+起動手順は [server/README.md](server/README.md) を参照してください。
 
-- 本番環境はレンタルサーバー（heteml）上にデプロイします。
-- DB接続情報・SSOクライアントシークレット等の機密情報は `.env` で管理し、Git にはコミットしません。
-  リポジトリには `.env.example` にダミー値のサンプルを用意します（`server/` 追加時に整備）。
-- ローカル開発は Docker 等の仮想環境で heteml 相当の PHP/MySQL 環境を再現する予定です
-  （実装ステップは [docs/開発ステップ_Phase2.md](docs/開発ステップ_Phase2.md) の Step 1 を参照）。
+```bash
+cp server/.env.example server/.env
+docker compose up -d --build
+curl http://localhost:8080/api/health
+```
+
+- 本番環境はレンタルサーバー（heteml、`mindmap.activefactor.org`）上にデプロイします。
+- DB接続情報・SSOクライアントシークレット等の機密情報は `.env` で管理し、Git にはコミットしません
+  （`server/.env.example` にダミー値のサンプルを用意）。
 
 ---
 
@@ -88,10 +94,10 @@ Phase 2 のバックエンド（PHP + MySQL、SSO認証）は設計完了・実�
 - [React Flow v11](https://reactflow.dev/)（マインドマップ描画）
 - [html-to-image](https://github.com/bubkoo/html-to-image) / [jsPDF](https://github.com/parallax/jsPDF)（PNG/PDF出力）
 
-### バックエンド（Phase 2、設計中）
+### バックエンド（Phase 2、構築中）
 
-- PHP 8.x（Composer）/ MySQL
-- OAuth 2.0 / OIDC（Google, Microsoft）
-- ホスティング: heteml
+- PHP 8.5（CGI版、Composer）/ MySQL 8.4
+- OAuth 2.0 / OIDC（Google, Microsoft）※ Step 3 で実装予定
+- ホスティング: heteml（`mindmap.activefactor.org`）
 
 詳細は [docs/基本設計書_Phase2.md](docs/基本設計書_Phase2.md) §8 を参照してください。
