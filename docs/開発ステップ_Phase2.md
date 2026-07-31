@@ -1,11 +1,11 @@
 # マインドマップツール 開発ステップ書
 ## Phase 2 — レンタルサーバー（heteml）移行版
 
-**バージョン**: 1.4
+**バージョン**: 1.5
 **作成日**: 2026-07-25
 **更新日**: 2026-07-31
 **対象フェーズ**: Phase 2
-**参照**: `docs/要件定義書.md` v2.1、`docs/基本設計書_Phase2.md` v2.1、`docs/開発標準ルール.md`、`docs/セキュリティポリシー.md`
+**参照**: `docs/要件定義書.md` v2.1、`docs/基本設計書_Phase2.md` v2.3、`docs/開発標準ルール.md`、`docs/セキュリティポリシー.md`
 
 > 本書は基本設計書_Phase2.md を実装可能な単位に分解したものです。各ステップは前のステップの
 > 完了を前提とします（依存関係は各ステップの冒頭に明記）。ステップの区切りは PR の区切りとも
@@ -162,42 +162,75 @@ MySQL接続をすべて検証した。残るのは Google/Microsoft 開発者コ
 
 ### ライブラリ選定（ADR化必須）
 
-- [ ] Google/Microsoft 双方の OAuth・OIDC 実装方式を検証し、ライブラリ（`league/oauth2-client`
-      系か、IDトークン検証込みで自前実装するか）を確定する（基本設計書_Phase2.md §12 未決定
-      事項 No.1）。選定理由を ADR に記録する
+- [x] **完了（2026-07-31）**: IDトークン検証に `firebase/php-jwt`（v7.1）を使用し、
+      OIDCフロー本体（Discovery・認可URL構築・トークン交換・UserInfo）は cURL で自前実装する
+      方針に確定。`league/oauth2-client` は不採用。選定理由は
+      `server/docs/adr/20260731_oidc実装方式とライブラリ選定.md` に記録
+      （基本設計書_Phase2.md §12 未決定事項 No.1 を解消）
 
 ### 実装項目
 
-- [ ] `state`（乱数・一回限り・有効期限10分・provider紐付け）、PKCE（`code_verifier`/
-      `code_challenge` S256）、`nonce` の生成・セッション保存・検証を実装する
-- [ ] Discovery Document・JWKS を用いたIDトークンの署名検証を実装する（`alg=none`拒否、
-      `kid`によるキー選択）
-- [ ] `iss`/`aud`/`exp`/`nonce` の検証を実装する。Microsoftは`iss`のテナント部分と`tid`
-      クレームの整合を確認する
-- [ ] UserInfoの`sub`とIDトークンの`sub`が一致することを確認する
-- [ ] 許可判定ロジック（許可ドメイン／許可アドレス、大文字小文字を無視した比較）を実装する
-- [ ] Googleログインで`hd`クレームによる追加チェックを実装する（該当する場合）
-- [ ] identity解決ロジック（`provider`+`provider_user_id`で検索 → 無ければメール確認 →
-      新規ユーザーの場合のみ作成、既存メールと衝突する場合は`login_denied_conflict`で拒否）
-      を実装する
-- [ ] セッションCookieを`HttpOnly`/`Secure`/`Path=/`/`SameSite=Lax`で発行する
-- [ ] CSRFトークンの発行・`X-CSRF-Token`ヘッダー検証ミドルウェアを実装する
-- [ ] `security_stamp`・`status`をリクエストごとに確認するミドルウェアを実装する
-- [ ] ログイン成功・拒否（許可リスト外／衝突／無効化済み）をそれぞれ監査ログに記録する
-      （トークン類は記録しない）
-- [ ] ログアウトAPI（CSRF検証込み）を実装する
-- [ ] アイドルタイムアウト（既定60分）を実装する
+- [x] `state`（乱数・一回限り・有効期限10分・provider紐付け）、PKCE（`code_verifier`/
+      `code_challenge` S256）、`nonce` の生成・セッション保存・検証 → `src/Auth/AuthTransaction.php`
+- [x] Discovery Document・JWKS を用いたIDトークンの署名検証（許可アルゴリズムを RS256 のみに
+      限定し `alg=none`・HMAC混同を拒否、`kid`によるキー選択）→ `src/Auth/IdTokenVerifier.php`
+- [x] `iss`/`aud`/`exp`/`nonce` の検証。Microsoftは`iss`のテナント部分と`tid`クレームの
+      整合を確認（`tid` の形式検証込み）→ 同上
+- [x] UserInfoの`sub`とIDトークンの`sub`が一致することを確認 →
+      `src/Http/Controller/AuthController.php::resolveProfile()`。
+      なお、IDトークンに `email` が含まれる通常のケースでは UserInfo を呼ばず、
+      不足する場合のみ参照する（不要な往復とトークン差し替えの機会を減らすため）
+- [x] 許可判定ロジック（許可ドメイン／許可アドレス、小文字化して比較）→ `src/Auth/AccessPolicy.php`
+- [x] Googleログインで`hd`クレームによる追加チェック（`email_verified` 必須、hdとメールの
+      ドメイン一致確認、hdなしの個人アカウントはドメイン許可では不可）→ 同上
+- [x] identity解決ロジック（`provider`+`provider_user_id`で検索 → 無ければメール確認 →
+      新規作成 / identity 0件なら初回ログイン扱い / 既存identityありなら
+      `login_denied_conflict`）→ `src/Auth/AccountResolver.php`
+- [x] セッションCookieを`HttpOnly`/`Secure`/`Path=/`/`SameSite=Lax`で発行
+      （HTTPSのときのみ `__Host-` 接頭辞）→ `src/Auth/SessionManager.php`
+- [x] CSRFトークンの発行・`X-CSRF-Token`ヘッダー検証ミドルウェア（Origin/Referer検証込み）
+      → `src/Http/CsrfGuard.php`
+- [x] `security_stamp`・`status`をリクエストごとに確認 → `SessionManager::currentUser()`
+- [x] ログイン成功・拒否（許可リスト外／衝突／無効化済み）を監査ログに記録
+      （トークン類は記録しない）→ `AuthController`、`src/Repository/AuditLogRepository.php`
+- [x] ログアウトAPI（CSRF検証込み）
+- [x] アイドルタイムアウト（既定60分、`.env` で変更可）
 
 ### テスト（基本設計書_Phase2_レビュー報告書_20260725.md §7「認証」を参照）
 
-- [ ] `state`の不一致・期限切れ・再利用を拒否するテスト
-- [ ] 不正署名・誤った`aud`・期限切れIDトークンを拒否するテスト
-- [ ] Microsoftの`iss`と`tid`が不一致のトークンを拒否するテスト
-- [ ] 同一メールで異なる`sub`（＝異なる主体）を自動統合しないテスト
-- [ ] 無効化されたユーザーの既存セッションが次のリクエストで使えなくなるテスト
+**PHPUnit 12 を dev 依存として導入し、Docker上で全34テスト・66アサーションがパスすることを
+確認済み（2026-07-31）。** 実行方法: `docker compose exec php ./vendor/bin/phpunit`
+
+- [x] `state`の不一致・期限切れ・再利用・provider違いを拒否するテスト（`AuthTransactionTest`）
+- [x] 不正署名（攻撃者の鍵で正規のkidを詐称）・誤った`aud`・期限切れ・`azp`不一致の
+      IDトークンを拒否するテスト（`IdTokenVerifierTest`）
+- [x] Microsoftの`iss`と`tid`が不一致／`tid`欠落／`tid`形式不正のトークンを拒否するテスト（同上）
+- [x] 同一メールで異なる`sub`（＝退職者のメール再割当てを想定）を自動統合しないテスト、
+      およびプロバイダ跨ぎで自動統合しないテスト（`AccountResolverTest`）
+- [x] 初期管理者（identity 0件）が初回ログインできるテスト（v2.3修正の回帰防止、同上）
+- [x] 許可判定のテスト: 許可ドメイン、未登録ドメイン拒否、hd詐称拒否、Google個人アカウントの
+      ドメイン許可拒否、個別メール許可、メール未検証拒否（同上）
+- [x] 無効化されたユーザー／`security_stamp`ローテーション後（＝降格後）の既存セッションが
+      次のリクエストで失効するテスト、アイドルタイムアウトのテスト（`SessionManagerTest`）
 
 **完了条件**: 上記すべての実装・テストが完了し、Google/Microsoft 双方でログイン
 （開発者コンソール登録済みのテストアカウント）が成功することを確認済みであること。
+
+**ステータス**: **実装・自動テストは完了（2026-07-31）。実プロバイダとのend-to-endログインは未実施。**
+
+> Google / Microsoft の開発者コンソールへのアプリ登録（クライアントID・シークレットの発行、
+> リダイレクトURIの登録）が未了のため、実際のアカウントでログインする最終確認ができていない。
+> これはユーザー側でのコンソール操作が必要な作業（Step 1 のチェックリストにも残項目として
+> 記載済み）。
+>
+> ただし、以下は実環境に対して検証済み:
+> - `GET /api/auth/google/redirect` が Google の**実際の** Discovery Document を取得し、
+>   PKCE(S256)・state・nonce を含む正しい認可URLへ302リダイレクトすること
+> - ルーティング、CSRF拒否（Origin無し→`invalid_origin`、トークン無し→`invalid_csrf_token`）、
+>   405/404、未ログイン時の`/api/auth/me`→401
+>
+> クライアントID・シークレットが `.env` に設定され次第、実ログインを確認して本ステップを
+> 完全に完了とする。
 
 ---
 
@@ -411,4 +444,5 @@ MySQL接続をすべて検証した。残るのは Google/Microsoft 開発者コ
 | 1.1 | 2026-07-29 | Step 0 に着手。heteml公式サポート情報の調査結果を反映し、一般仕様として確認できた項目にチェックを入れ、契約アカウント固有の確認が必要な項目を明確化した。§0共通ルールのdevlog置き場所の記載を開発標準ルール.md §2.1と整合させた |
 | 1.2 | 2026-07-31 | Step 0 をユーザー提供の実機情報（ドメイン・PHP/MySQLバージョン等）で完了。Step 1（Docker環境構築）に着手し、`server/`一式（composer.json, .env.example, Dockerfile, docker-compose.yml, ヘルスチェック用フロントコントローラ, README）を作成。実行環境にDockerが無く`docker compose up`での動作確認は開発者側での実施が必要である旨を明記 |
 | 1.3 | 2026-07-31 | ユーザー環境でDockerが利用可能になったため、`docker compose up -d --build`を実際に実行しStep 1を完了。ヘルスチェック（200 OK）・PHP拡張5種（curl/openssl/zip/pdo_mysql/mbstring）・`composer install`・MySQL 8.4接続をすべて検証済み。`composer.lock`をリポジトリに追加 |
+| 1.5 | 2026-07-31 | Step 3（認証基盤）の実装・自動テストを完了。OIDC実装方式をADR化（firebase/php-jwt＋自前フロー）し、state/PKCE/nonce・IDトークン検証・許可判定・アカウント解決・セッション/CSRF/security_stampを実装。PHPUnit 12を導入し34テストがパス。実プロバイダとのend-to-endログインのみ、開発者コンソール登録待ちで未実施 |
 | 1.4 | 2026-07-31 | Step 2（DBスキーマ実装）完了。migrations一式・自前マイグレーションランナ・seedスクリプトを作成し、Docker上のMySQLで冪等性・複合FK制約（他人のフォルダへの不正な紐付けを拒否）を実際に検証。実装時にDDLのトランザクション扱いに関する不具合と、基本設計書のアカウント解決ロジックの欠陥（初期管理者が永久にログインできない）を発見し、いずれも修正済み |

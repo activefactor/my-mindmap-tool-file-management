@@ -28,3 +28,4 @@ server/vendor/
 server/.env
 server/storage/tmp/*
 !server/storage/tmp/.gitkeep
+server/.phpunit.cache/
