@@ -79,8 +79,8 @@ Phase 2（レンタルサーバー heteml への移行）のバックエンド�
 
 - **Phase 1**（サーバーレス・認証なし）: 承認済み・リリース済み（GitHub Pages）。
 - **Phase 2**（heteml サーバー移行・SSO・ダッシュボード・フォルダ管理・保存方式変更）:
-  `docs/要件定義書.md` v2.1 承認済み。`docs/基本設計書_Phase2.md` v2.2、
-  `docs/開発ステップ_Phase2.md` v1.2。「構築」フェーズ実施中。
+  `docs/要件定義書.md` v2.1 承認済み。`docs/基本設計書_Phase2.md` v2.3、
+  `docs/開発ステップ_Phase2.md` v1.4。「構築」フェーズ実施中。
   - **確定した実機情報**（2026-07-31）: ドメイン `mindmap.activefactor.org`、公開パス
     `/web/activefactor.org/mindmap/`、PHP 8.5（CGI版）、MySQL 8.4
   - **Step 0**（前提確認）: 完了。
@@ -88,6 +88,14 @@ Phase 2（レンタルサーバー heteml への移行）のバックエンド�
     `docker compose up -d --build` でヘルスチェック（200 OK）、PHP拡張5種
     （curl/openssl/zip/pdo_mysql/mbstring）、`composer install`、MySQL 8.4 接続を確認済み。
     Google/Microsoft開発者コンソールへのリダイレクトURI登録のみ Step 3 までに要対応。
+  - **Step 2**（DBスキーマ実装）: 完了・検証済み（2026-07-31）。`server/db/migrations/`
+    （7テーブル）・自前マイグレーションランナ（`server/db/migrate.php`）・初期管理者
+    シード（`server/db/seed.php`）を作成し、複合FK制約・冪等性をDocker上で実検証。
+    実装過程で発見した2件の不具合（DDLをトランザクションで囲うとPDOが例外を投げる、
+    アカウント解決ロジックが初期管理者のログインを永久に拒否してしまう）を修正済み。
+  - 次: **Step 3**（認証基盤: OAuth・IDトークン検証・セッション・許可判定）。
+    `docs/基本設計書_Phase2.md` §3.1 のアカウント解決ロジック（2026-07-31修正版）を
+    正しく実装すること。
   - 次: Step 2（DBスキーマ実装）以降は `docs/基本設計書_Phase2.md` §12 の未決定事項
     （Microsoft OAuthライブラリ、ルーティングライブラリ、容量上限の具体値、バックアップ
     RPO/RTO等）を解消しながら進める。

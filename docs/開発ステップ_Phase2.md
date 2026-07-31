@@ -1,7 +1,7 @@
 # マインドマップツール 開発ステップ書
 ## Phase 2 — レンタルサーバー（heteml）移行版
 
-**バージョン**: 1.3
+**バージョン**: 1.4
 **作成日**: 2026-07-25
 **更新日**: 2026-07-31
 **対象フェーズ**: Phase 2
@@ -113,20 +113,42 @@ MySQL接続をすべて検証した。残るのは Google/Microsoft 開発者コ
 **依存**: Step 1
 **対応**: 基本設計書_Phase2.md §5.1
 
-- [ ] `server/db/migrations/` に、基本設計書_Phase2.md §5.1 の全テーブル
-      （`users`, `user_identities`, `allowed_domains`, `allowed_emails`, `folders`,
-      `mindmaps`, `audit_logs`）のDDLを作成する
-- [ ] `folders(id, user_id)` の複合UNIQUEキーと、`mindmaps(folder_id, user_id)` の
-      複合外部キーが設計どおりに機能することを確認する（他人のフォルダを指定した
-      INSERT/UPDATEがDBレベルで拒否されることを確認するテストを書く）
-- [ ] `mindmaps.revision` のデフォルト値・`deleted_at` の扱いを確認する
-- [ ] `server/db/seed.php` を作成し、`.env` の `INITIAL_ADMIN_EMAIL` /
-      `INITIAL_ALLOWED_DOMAIN` から初期管理者・初期許可ドメインを投入できることを確認する
-- [ ] マイグレーションをローカル環境で複数回実行し、冪等性（再実行してもエラーにならない、
-      または「既に適用済み」として安全にスキップされる）を確認する
+- [x] **完了（2026-07-31）**: `server/db/migrations/` に、基本設計書_Phase2.md §5.1 の
+      全テーブル（`users`, `user_identities`, `allowed_domains`, `allowed_emails`,
+      `folders`, `mindmaps`, `audit_logs`）を、依存関係順に番号を振った7つのDDLファイル
+      （`0001_create_users.sql` 〜 `0007_create_audit_logs.sql`）として作成した。
+      適用済みファイルは `schema_migrations` テーブルで管理する自前ランナ
+      （`server/db/migrate.php`）を実装した
+- [x] **検証済み（2026-07-31）**: `folders(id, user_id)` の複合UNIQUEキーと
+      `mindmaps(folder_id, user_id)` の複合外部キーを、実際にDockerのMySQL上で検証した。
+      別ユーザーのフォルダを指定した `INSERT` は `ERROR 1452 (23000)` で拒否されること、
+      自分のフォルダおよび `folder_id = NULL`（ルート直下）は正常に `INSERT` できることを
+      確認した
+- [x] **検証済み（2026-07-31）**: `mindmaps.revision` は `DEFAULT 1`、`deleted_at` は
+      `NULL`（通常）/ `NOT NULL`（ゴミ箱）で機能することを実データで確認した
+- [x] **完了（2026-07-31）**: `server/db/seed.php` を作成した。`.env` の
+      `INITIAL_ADMIN_EMAIL` / `INITIAL_ALLOWED_DOMAIN` から初期管理者・許可ドメイン・
+      許可アドレスを投入できることを確認し、複数回実行しても重複しない
+      （`INSERT IGNORE` / `ON DUPLICATE KEY UPDATE`）ことも確認した
+- [x] **検証済み（2026-07-31）**: `docker compose exec php php db/migrate.php` を複数回実行し、
+      2回目以降はすべて `skip` されることを確認した（冪等性OK）
 
 **完了条件**: ローカルDocker環境でマイグレーション一式が実行でき、seedで初期管理者が
 作成されることを確認済みであること。
+
+**ステータス**: **完了（2026-07-31）**。
+
+> **実装時に発見した不具合（重要）**: 当初 `migrate.php` はDDL実行を
+> `beginTransaction()`/`commit()`/`rollBack()` で囲っていたが、MySQLのDDL（`CREATE TABLE`）は
+> 実行時に暗黙のコミットが発生するため、その後の `commit()`/`rollBack()` がPDOの
+> `PDOException: There is no active transaction` を引き起こしてスクリプトが異常終了する
+> 不具合があった。DDLはトランザクションで囲わず、DDL成功後に `schema_migrations` への
+> 記録を別操作として行う方式に修正した（詳細は `server/docs/devlog/` 参照）。
+>
+> また、`db/seed.php` の設計中に、基本設計書_Phase2.md §3.1 のアカウント解決ロジックに
+> 欠陥（既存ユーザーに `user_identities` が0件の場合でも conflict 扱いになり、シードで
+> 作成した初期管理者が永久にログインできなくなる）を発見し、設計書側を修正済み
+> （v2.2→v2.3）。
 
 ---
 
@@ -389,3 +411,4 @@ MySQL接続をすべて検証した。残るのは Google/Microsoft 開発者コ
 | 1.1 | 2026-07-29 | Step 0 に着手。heteml公式サポート情報の調査結果を反映し、一般仕様として確認できた項目にチェックを入れ、契約アカウント固有の確認が必要な項目を明確化した。§0共通ルールのdevlog置き場所の記載を開発標準ルール.md §2.1と整合させた |
 | 1.2 | 2026-07-31 | Step 0 をユーザー提供の実機情報（ドメイン・PHP/MySQLバージョン等）で完了。Step 1（Docker環境構築）に着手し、`server/`一式（composer.json, .env.example, Dockerfile, docker-compose.yml, ヘルスチェック用フロントコントローラ, README）を作成。実行環境にDockerが無く`docker compose up`での動作確認は開発者側での実施が必要である旨を明記 |
 | 1.3 | 2026-07-31 | ユーザー環境でDockerが利用可能になったため、`docker compose up -d --build`を実際に実行しStep 1を完了。ヘルスチェック（200 OK）・PHP拡張5種（curl/openssl/zip/pdo_mysql/mbstring）・`composer install`・MySQL 8.4接続をすべて検証済み。`composer.lock`をリポジトリに追加 |
+| 1.4 | 2026-07-31 | Step 2（DBスキーマ実装）完了。migrations一式・自前マイグレーションランナ・seedスクリプトを作成し、Docker上のMySQLで冪等性・複合FK制約（他人のフォルダへの不正な紐付けを拒否）を実際に検証。実装時にDDLのトランザクション扱いに関する不具合と、基本設計書のアカウント解決ロジックの欠陥（初期管理者が永久にログインできない）を発見し、いずれも修正済み |
