@@ -1,7 +1,7 @@
 # マインドマップツール 開発ステップ書
 ## Phase 2 — レンタルサーバー（heteml）移行版
 
-**バージョン**: 1.6
+**バージョン**: 1.7
 **作成日**: 2026-07-25
 **更新日**: 2026-08-01
 **対象フェーズ**: Phase 2
@@ -267,27 +267,58 @@ Microsoft 固有の検証ロジック（`common` テナントの `iss`/`tid` 整
 **依存**: Step 3
 **対応**: FR-08
 
-- [ ] ユーザー一覧API（ページネーション）を実装する
-- [ ] ロール変更・無効化／再有効化APIを実装する。対象行を`SELECT ... FOR UPDATE`でロックし、
+- [x] ユーザー一覧API（ページネーション）を実装する → `GET /api/admin/users`
+      （`page`/`per_page`/`q` 対応。`security_stamp` は返さない）
+- [x] ロール変更・無効化／再有効化APIを実装する。対象行を`SELECT ... FOR UPDATE`でロックし、
       同一トランザクション内で「更新後も管理者が1人以上残るか」を再確認してから更新する
-- [ ] ロール変更・ステータス変更時に`security_stamp`を再生成し、監査ログに変更前後の値を
-      記録する
-- [ ] 許可ドメイン／許可アドレスのCRUD APIを実装する
-- [ ] 監査ログ一覧API（ページネーション・日時範囲/操作種別フィルタ）を実装する
-- [ ] ストレージ使用状況API（`SUM(LENGTH(data))`による概算）を実装する
-- [ ] フロントエンド: `AdminConsolePage`, `UserTable`, `AllowedDomainList`,
-      `AllowedEmailList`, `AuditLogTable` を実装する
-- [ ] 一般ユーザーが`/admin`にアクセスした場合に403でダッシュボードへリダイレクトされることを
-      確認する
+      → `src/Admin/UserAdminService.php`
+- [x] ロール変更・ステータス変更時に`security_stamp`を再生成し、監査ログに変更前後の値を
+      記録する（更新・stamp再生成・監査ログを同一トランザクションで実行）
+- [x] 許可ドメイン／許可アドレスのCRUD APIを実装する（`INSERT IGNORE` で重複時は409）
+- [x] 監査ログ一覧API（ページネーション・日時範囲/操作種別フィルタ）を実装する
+- [x] ストレージ使用状況API（`SUM(LENGTH(data))`による概算）を実装する
+- [x] フロントエンド: `AdminConsolePage`, `UserTable`, `AllowedDomainList`,
+      `AllowedEmailList`, `AuditLogTable` を実装する（+ `StorageUsagePanel`）。
+      あわせてルーティング（`react-router-dom`）・`useAuth`・APIクライアント・
+      ログイン画面を導入した（ADR: `mindmap-tool/docs/adr/20260801_...`）
+- [x] 一般ユーザーが`/admin`にアクセスした場合に403でダッシュボードへリダイレクトされることを
+      確認する（API側は 403 を実測確認。画面側は `RequireAdmin` で `/dashboard` へ遷移）
 
 ### テスト
 
-- [ ] 複数の管理者が同時に別の管理者を降格しても、管理者が0人にならないことを確認する
-      並行テスト
-- [ ] 自分自身をロール変更しようとした場合に拒否されることを確認する
+- [x] 複数の管理者が同時に別の管理者を降格しても、管理者が0人にならないことを確認する
+      並行テスト（`UserAdminServiceTest::testConcurrentDemotionCannotLeaveZeroAdmins`。
+      別接続で行ロックを保持した状態で降格を試み、409 になることと管理者が残ることを確認）
+- [x] 自分自身をロール変更しようとした場合に拒否されることを確認する
+      （自己無効化の拒否も追加）
 
 **完了条件**: 管理者アカウントでユーザー管理・許可リスト管理・監査ログ閲覧が一通り
 動作すること。
+
+**ステータス**: **API は完了・実測検証済み（2026-08-01）。画面は実装・ビルド確認済みだが、
+ブラウザでの通し確認が未実施。**
+
+> - PHPUnit: 54テスト・133アサーションがパス（Step 3 の34件 + Step 4 の20件）。
+> - HTTP 実測: 未認証401 / 一般ユーザー403 / CSRF欠落403 / フォーム形式Content-Type 415 /
+>   不正な値422 / 自己変更403 / 存在しないユーザー404 / 重複登録409、および
+>   ロール変更後に対象ユーザーの既存セッションが即座に失効することを確認。
+> - 画面は `tsc` / `eslint` / `vite build` がすべて通ることを確認。
+>   ブラウザでの操作確認には下記の「開発時のリダイレクトURI」の対応が必要。
+
+### 残項目: 開発サーバー（Vite）でのログイン
+
+Vite の開発サーバー（`http://localhost:5173`）から API へは proxy 経由で到達できるが、
+`.env` の `GOOGLE_REDIRECT_URI` / `APP_URL` が `http://localhost:8080` を指しているため、
+**ログイン後のリダイレクト先が PHP 側（8080）になり、React の画面に戻ってこない**。
+
+開発サーバーで通しの動作確認を行う場合は、次のいずれかを行う。
+
+- [ ] **案A（HMRを使う。推奨）**: Google Cloud Console に
+      `http://localhost:5173/api/auth/google/callback` を追加し、`.env` の
+      `APP_URL=http://localhost:5173`、`GOOGLE_REDIRECT_URI` を同 URL に変更する。
+      すべてが 5173 の同一オリジンになり、Cookie・CSRF の Origin 検証も本番と同条件になる。
+- [ ] **案B**: `npm run build` した `dist/` を Apache（8080）から配信する。本番構成に
+      近いが HMR は使えない。Step 11 のデプロイ構成の予行にもなる。
 
 ---
 
@@ -480,4 +511,5 @@ Microsoft 固有の検証ロジック（`common` テナントの `iss`/`tid` 整
 | 1.3 | 2026-07-31 | ユーザー環境でDockerが利用可能になったため、`docker compose up -d --build`を実際に実行しStep 1を完了。ヘルスチェック（200 OK）・PHP拡張5種（curl/openssl/zip/pdo_mysql/mbstring）・`composer install`・MySQL 8.4接続をすべて検証済み。`composer.lock`をリポジトリに追加 |
 | 1.4 | 2026-07-31 | Step 2（DBスキーマ実装）完了。migrations一式・自前マイグレーションランナ・seedスクリプトを作成し、Docker上のMySQLで冪等性・複合FK制約（他人のフォルダへの不正な紐付けを拒否）を実際に検証。実装時にDDLのトランザクション扱いに関する不具合と、基本設計書のアカウント解決ロジックの欠陥（初期管理者が永久にログインできない）を発見し、いずれも修正済み |
 | 1.5 | 2026-07-31 | Step 3（認証基盤）の実装・自動テストを完了。OIDC実装方式をADR化（firebase/php-jwt＋自前フロー）し、state/PKCE/nonce・IDトークン検証・許可判定・アカウント解決・セッション/CSRF/security_stampを実装。PHPUnit 12を導入し34テストがパス。実プロバイダとのend-to-endログインのみ、開発者コンソール登録待ちで未実施 |
+| 1.7 | 2026-08-01 | Step 4（管理コンソール）を実装。ユーザー管理・許可リスト・監査ログ・ストレージ使用状況のAPI、最後の管理者保護（`SELECT ... FOR UPDATE` + 同一トランザクション）、管理者認可ガード、Content-Type検証を実装。フロントエンドに `react-router-dom` を導入し（ADR記録）、ログイン画面・管理コンソール画面・認可ガードを追加。PHPUnit 54件パス、HTTP実測で認可・CSRF・バリデーション・セッション即時失効を確認。開発サーバー（Vite）でのログインにはリダイレクトURIの追加登録が必要な点を残項目として明記 |
 | 1.6 | 2026-08-01 | Google Cloud Console へのアプリ登録が完了し、実アカウントでのend-to-endログインを検証してStep 3を完了とした。実JWKSによる署名検証、個別メール許可での通過、identity 0件の既存ユーザー（初期管理者）の初回ログイン紐付け、監査ログ記録、`/api/auth/me` によるセッション維持を確認。Microsoft のアプリ登録はユーザー判断により当面見送りとし、その旨をStep 1/3に明記。登録したGoogle OAuthクライアントの設定値（リダイレクトURI等）をStep 3に記録 |

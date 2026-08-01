@@ -104,8 +104,17 @@ Phase 2（レンタルサーバー heteml への移行）のバックエンド�
     紐付け、監査ログ、`/api/auth/me` でのセッション維持）。
     **Microsoft のアプリ登録はユーザー判断により当面見送り。** コードは実装済みのため
     `.env` に `MS_CLIENT_ID` 等を設定すれば有効になる。
-  - 次: **Step 4**（管理コンソール API・画面）。ロール変更・無効化の際に
-    `security_stamp` を再生成する処理はここで実装する（Step 3 では検証側のみ実装済み）。
+  - **Step 4**（管理コンソール API・画面）: API は完了・実測検証済み（2026-08-01）。
+    ユーザー管理・許可リスト・監査ログ・ストレージ使用状況の7エンドポイント、
+    最後の管理者保護（`SELECT ... FOR UPDATE` + 同一トランザクション）、`security_stamp`
+    の再生成、Content-Type 検証を実装。PHPUnit 54件パス。
+    フロントは `react-router-dom` を導入し（ADR `mindmap-tool/docs/adr/20260801_...`）、
+    ログイン画面・管理コンソール画面・認可ガードを実装（`tsc`/`eslint`/`build` は通過、
+    **ブラウザでの通し確認は未実施**）。
+    - **開発サーバー（Vite:5173）ではログインが通らない**。`.env` の `GOOGLE_REDIRECT_URI`/
+      `APP_URL` が 8080 を指すため。Google Console に 5173 のコールバックURIを追加し
+      `.env` を切り替えると解消（開発ステップ書 Step 4 の残項目）。
+  - 次: **Step 5**（マインドマップ CRUD API・ソフトデリート）。
   - テスト実行: `docker compose exec php ./vendor/bin/phpunit`（要 `docker compose up -d`）
   - `server/.env` は docker-compose の `env_file` として**コンテナ生成時に**読み込まれる。
     書き換えたら `docker compose up -d --force-recreate php` で作り直すこと。

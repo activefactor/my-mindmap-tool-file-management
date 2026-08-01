@@ -128,4 +128,59 @@ final class UserRepository
     {
         return bin2hex(random_bytes(16));
     }
+
+    /**
+     * 管理コンソールのユーザー一覧（FR-08-1）。
+     * `security_stamp` は機微なためクライアントに渡す行には含めない。
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function paginate(int $limit, int $offset, ?string $keyword = null): array
+    {
+        $sql = 'SELECT id, email, display_name, role, status, last_login_at, created_at
+                FROM users';
+        $params = [];
+
+        if ($keyword !== null) {
+            // ネイティブプリペアド（EMULATE_PREPARES=false）では同じ名前付き
+            // プレースホルダを複数箇所に置けないため、別名にして同じ値を渡す
+            $sql .= ' WHERE email LIKE :keyword_email OR display_name LIKE :keyword_name';
+            $params['keyword_email'] = '%' . self::escapeLike($keyword) . '%';
+            $params['keyword_name'] = $params['keyword_email'];
+        }
+
+        // LIMIT/OFFSET はプレースホルダにすると文字列として渡り構文エラーになるため、
+        // int にキャストしてから埋め込む（呼び出し元で範囲は検証済み）。
+        $sql .= sprintf(' ORDER BY id ASC LIMIT %d OFFSET %d', $limit, $offset);
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+
+        return $stmt->fetchAll();
+    }
+
+    public function countAll(?string $keyword = null): int
+    {
+        $sql = 'SELECT COUNT(*) FROM users';
+        $params = [];
+
+        if ($keyword !== null) {
+            // ネイティブプリペアド（EMULATE_PREPARES=false）では同じ名前付き
+            // プレースホルダを複数箇所に置けないため、別名にして同じ値を渡す
+            $sql .= ' WHERE email LIKE :keyword_email OR display_name LIKE :keyword_name';
+            $params['keyword_email'] = '%' . self::escapeLike($keyword) . '%';
+            $params['keyword_name'] = $params['keyword_email'];
+        }
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+
+        return (int) $stmt->fetchColumn();
+    }
+
+    /** LIKE のワイルドカード文字を無効化する（検索語の `%` を全件一致にしない）。 */
+    private static function escapeLike(string $value): string
+    {
+        return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
+    }
 }

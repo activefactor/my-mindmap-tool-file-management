@@ -29,6 +29,10 @@ final class CsrfGuard
             return 'invalid_origin';
         }
 
+        if (!self::contentTypeIsAllowed()) {
+            return 'unsupported_media_type';
+        }
+
         $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
 
         if (!SessionManager::verifyCsrfToken(is_string($token) ? $token : null)) {
@@ -36,6 +40,28 @@ final class CsrfGuard
         }
 
         return null;
+    }
+
+    /**
+     * ボディを伴うリクエストは `application/json` のみ許可する（基本設計書_Phase2.md §6.1）。
+     *
+     * HTMLフォームから送信できるのは `application/x-www-form-urlencoded` /
+     * `multipart/form-data` / `text/plain` の3種類だけなので、JSONを必須にすると
+     * フォーム経由の単純なCSRFは形式面でも成立しなくなる。
+     *
+     * ボディが無い場合（DELETE 等）は fetch が Content-Type を付けないため対象外とする。
+     */
+    private static function contentTypeIsAllowed(): bool
+    {
+        if ((int) ($_SERVER['CONTENT_LENGTH'] ?? 0) === 0) {
+            return true;
+        }
+
+        $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+
+        // `application/json; charset=utf-8` のようなパラメータ付きも許可する
+        return is_string($contentType)
+            && preg_match('#^application/json\s*(;.*)?$#i', trim($contentType)) === 1;
     }
 
     private static function originIsAllowed(): bool
