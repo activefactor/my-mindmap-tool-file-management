@@ -71,11 +71,14 @@ Phase 2（レンタルサーバー heteml への移行）のバックエンド�
 - **XSS対策**: `dangerouslySetInnerHTML` / `innerHTML` への文字列代入禁止（`docs/セキュリティポリシー.md` §3.1）。
 - **機密情報**: DB接続情報・SSOクライアントシークレット等は `.env` で管理し、Git にコミットしない。
   リポジトリには `.env.example` にサンプル値（ダミー）を用意する。
-- **`main` へ直接コミットしない**。ブランチ運用は `docs/開発標準ルール.md` §4.1 に従う。
+- **ブランチ運用**: 通常は `main` へ直接コミットしない（`docs/開発標準ルール.md` §4.1）。
+  ただし **Phase 2 の運用開始（Step 11 の本番デプロイ）までは `main` への直接コミットを許容する**
+  （2026-08-01 ユーザー判断。単独開発かつ本番環境が未存在で、ブランチ分離の実益がないため）。
+  運用開始以降は §4.1 のブランチ戦略に移行する。
 - **`any` 型禁止**（やむを得ない場合は `// TODO: 型定義` を付す）。
 - コミットメッセージは Conventional Commits（`docs/開発標準ルール.md` §4.2）。
 
-## Phase 状況（2026-07-31 時点）
+## Phase 状況（2026-08-01 時点）
 
 - **Phase 1**（サーバーレス・認証なし）: 承認済み・リリース済み（GitHub Pages）。
 - **Phase 2**（heteml サーバー移行・SSO・ダッシュボード・フォルダ管理・保存方式変更）:
@@ -93,17 +96,21 @@ Phase 2（レンタルサーバー heteml への移行）のバックエンド�
     シード（`server/db/seed.php`）を作成し、複合FK制約・冪等性をDocker上で実検証。
     実装過程で発見した2件の不具合（DDLをトランザクションで囲うとPDOが例外を投げる、
     アカウント解決ロジックが初期管理者のログインを永久に拒否してしまう）を修正済み。
-  - **Step 3**（認証基盤）: 実装・自動テスト完了（2026-07-31）。OIDC実装方式は
+  - **Step 3**（認証基盤）: 完了・実機検証済み（2026-08-01）。OIDC実装方式は
     `firebase/php-jwt` + 自前フロー（ADR `server/docs/adr/20260731_...` 参照）。
     PHPUnit 12 導入、34テストがパス（`docker compose exec php ./vendor/bin/phpunit`）。
-    **ただし Google/Microsoft 開発者コンソールへのアプリ登録が未了のため、実アカウントでの
-    end-to-endログインは未検証。** `.env` にクライアントID/シークレットが入り次第確認する。
+    Google Cloud Console へのアプリ登録後、実アカウントでの end-to-end ログインを検証済み
+    （実JWKSによる署名検証、個別メール許可での通過、identity 0件の既存ユーザーの初回ログイン
+    紐付け、監査ログ、`/api/auth/me` でのセッション維持）。
+    **Microsoft のアプリ登録はユーザー判断により当面見送り。** コードは実装済みのため
+    `.env` に `MS_CLIENT_ID` 等を設定すれば有効になる。
   - 次: **Step 4**（管理コンソール API・画面）。ロール変更・無効化の際に
     `security_stamp` を再生成する処理はここで実装する（Step 3 では検証側のみ実装済み）。
   - テスト実行: `docker compose exec php ./vendor/bin/phpunit`（要 `docker compose up -d`）
-  - 次: Step 2（DBスキーマ実装）以降は `docs/基本設計書_Phase2.md` §12 の未決定事項
-    （Microsoft OAuthライブラリ、ルーティングライブラリ、容量上限の具体値、バックアップ
-    RPO/RTO等）を解消しながら進める。
+  - `server/.env` は docker-compose の `env_file` として**コンテナ生成時に**読み込まれる。
+    書き換えたら `docker compose up -d --force-recreate php` で作り直すこと。
+  - 残る未決定事項（`docs/基本設計書_Phase2.md` §12）: ルーティングライブラリ、容量上限の
+    具体値、バックアップ RPO/RTO 等。各ステップで解消しながら進める。
   - 認証方式・保存方式・セキュリティ設計の詳細は `docs/基本設計書_Phase2.md` を参照。
 - **Phase 3**（AI連携）: 未着手。
 - **Phase 4**（共同編集）: 未着手・将来検討。

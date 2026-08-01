@@ -1,11 +1,11 @@
 # マインドマップツール 開発ステップ書
 ## Phase 2 — レンタルサーバー（heteml）移行版
 
-**バージョン**: 1.5
+**バージョン**: 1.6
 **作成日**: 2026-07-25
-**更新日**: 2026-07-31
+**更新日**: 2026-08-01
 **対象フェーズ**: Phase 2
-**参照**: `docs/要件定義書.md` v2.1、`docs/基本設計書_Phase2.md` v2.3、`docs/開発標準ルール.md`、`docs/セキュリティポリシー.md`
+**参照**: `docs/要件定義書.md` v2.1、`docs/基本設計書_Phase2.md` v2.4、`docs/開発標準ルール.md`、`docs/セキュリティポリシー.md`
 
 > 本書は基本設計書_Phase2.md を実装可能な単位に分解したものです。各ステップは前のステップの
 > 完了を前提とします（依存関係は各ステップの冒頭に明記）。ステップの区切りは PR の区切りとも
@@ -90,10 +90,10 @@
       環境のため、同様にアクセス可能と判断する
 - [x] **検証済み（2026-07-31）**: `docker compose exec mysql mysql ...` で MySQL 8.4.11 に
       接続できることを確認した
-- [ ] Google / Microsoft の開発者コンソールに、ローカル開発用のリダイレクトURI
-      （`http://localhost:8080/api/auth/google/callback` 等）を登録する。
-      **Google/Microsoftの開発者コンソールへのアクセスが必要なため、ユーザー側での対応が必要**
-      （Step 3でOAuthを実装する前までに完了していればよく、Step 1完了の必須条件ではない）
+- [x] **Google は完了（2026-08-01）**: Google Cloud Console にウェブアプリケーションの
+      クライアントを登録し、リダイレクトURI `http://localhost:8080/api/auth/google/callback`
+      を設定。実ログインまで確認済み（Step 3 参照）。
+      **Microsoft はユーザー判断により当面見送り**（必要になった時点で実施）
 - [x] `.env.example` を作成した（`server/.env.example`。基本設計書_Phase2.md §11 の内容
       をベースに、ローカルDocker用に `DB_HOST=mysql` をデフォルト値とした）
 - [x] `server/README.md` にローカル起動手順を記載した
@@ -103,8 +103,7 @@
 
 **ステータス**: **完了（2026-07-31）**。ユーザーの環境で Docker が利用可能になったため、
 実際に `docker compose up -d --build` を実行し、ヘルスチェック・PHP拡張・Composer・
-MySQL接続をすべて検証した。残るのは Google/Microsoft 開発者コンソールへのリダイレクトURI
-登録のみで、これは Step 3（認証基盤）着手までに行えばよい。
+MySQL接続をすべて検証した。Google 開発者コンソールへのリダイレクトURI登録も完了（2026-08-01）。
 
 ---
 
@@ -216,21 +215,50 @@ MySQL接続をすべて検証した。残るのは Google/Microsoft 開発者コ
 **完了条件**: 上記すべての実装・テストが完了し、Google/Microsoft 双方でログイン
 （開発者コンソール登録済みのテストアカウント）が成功することを確認済みであること。
 
-**ステータス**: **実装・自動テストは完了（2026-07-31）。実プロバイダとのend-to-endログインは未実施。**
+**ステータス**: **完了（2026-08-01）。ただし Microsoft は当面見送り（下記）。**
 
-> Google / Microsoft の開発者コンソールへのアプリ登録（クライアントID・シークレットの発行、
-> リダイレクトURIの登録）が未了のため、実際のアカウントでログインする最終確認ができていない。
-> これはユーザー側でのコンソール操作が必要な作業（Step 1 のチェックリストにも残項目として
-> 記載済み）。
->
-> ただし、以下は実環境に対して検証済み:
-> - `GET /api/auth/google/redirect` が Google の**実際の** Discovery Document を取得し、
->   PKCE(S256)・state・nonce を含む正しい認可URLへ302リダイレクトすること
-> - ルーティング、CSRF拒否（Origin無し→`invalid_origin`、トークン無し→`invalid_csrf_token`）、
->   405/404、未ログイン時の`/api/auth/me`→401
->
-> クライアントID・シークレットが `.env` に設定され次第、実ログインを確認して本ステップを
-> 完全に完了とする。
+### end-to-endログインの検証結果（2026-08-01）
+
+Google Cloud Console にウェブアプリケーションのクライアントを登録し、実アカウントでの
+ログインが成功することを確認した。
+
+- [x] 実ブラウザで `GET /api/auth/google/redirect` → Google 同意画面 → コールバック →
+      `APP_URL/dashboard` へのリダイレクトまで到達（ダッシュボード画面は Step 8 で実装するため
+      404 になるが、リダイレクト先としては正しい）
+- [x] Google の**実際の JWKS** による ID トークン署名検証を通過（テストではモック鍵を使用していた
+      経路が実プロバイダで動作することを確認）
+- [x] 許可判定: 個人 Gmail アカウントを `allowed_emails` に登録して通過。
+      `allowed_domains` は空のまま（設計どおり、`hd` を持たない個人アカウントはドメイン許可では
+      通らない）
+- [x] identity 解決: シードで作成した「`user_identities` が0件の既存ユーザー」が
+      `login_denied_conflict` にならず初回ログインとして紐付けられた
+      （`user_identities` に `provider=google` の行が生成）。**設計書 v2.3 で修正した欠陥
+      （初期管理者が永久にログインできない）が実プロバイダ相手でも解消されていることの実地確認**
+- [x] `users.display_name` がプロバイダのプロフィール名で更新され、`last_login_at` が記録された
+- [x] 監査ログに `action=login` / `detail={"provider":"google"}` が記録された
+      （トークン類は記録されていない）
+- [x] ログイン後のセッションで `GET /api/auth/me` が 200 でユーザー情報（`role=admin`）と
+      CSRFトークンを返す（＝セッション維持と `security_stamp` 照合が動作している）
+
+**登録した Google OAuth クライアントの設定値**（Step 11 の本番デプロイでも使用）:
+
+| 項目 | 値 |
+| --- | --- |
+| クライアントの種類 | ウェブ アプリケーション |
+| 承認済みのリダイレクトURI | `http://localhost:8080/api/auth/google/callback`（ローカル）<br>`https://mindmap.activefactor.org/api/auth/google/callback`（本番） |
+| 承認済みのJavaScript生成元 | 本方式では不要（サーバーサイド完結のフローのため、ブラウザから Google のオリジンへ直接リクエストしない） |
+| スコープ | `openid` / `email` / `profile` |
+
+### 残項目: Microsoft
+
+- [ ] Microsoft（Entra ID）のアプリ登録と end-to-end ログイン確認 —
+      **ユーザー判断により当面見送り（2026-08-01）。必要になった時点で実施する。**
+
+コード側は Google/Microsoft 双方を実装済みで、`.env` の `MS_CLIENT_ID` / `MS_CLIENT_SECRET` /
+`MS_REDIRECT_URI` を設定するだけで有効になる。`ProviderConfig::for()` はリクエストされた
+プロバイダの分だけ評価されるため、Microsoft の値がダミーのままでも Google のフローには影響しない。
+Microsoft 固有の検証ロジック（`common` テナントの `iss`/`tid` 整合、`tid` の形式検証）は
+`IdTokenVerifierTest` で単体テスト済み。
 
 ---
 
@@ -415,6 +443,12 @@ MySQL接続をすべて検証した。残るのは Google/Microsoft 開発者コ
 - [ ] heteml cronにZipクリーンアップ・ゴミ箱自動完全削除のジョブを設定する
 - [ ] バックアップ対象・RPO/RTOを確認し、`docs/基本設計書_Phase2.md` §6.6を確定情報で更新する
 - [ ] 「海外アタックガード設定」を有効化するかどうかを判断し、判断内容をdevlogに記録する
+- [ ] Google Cloud Console の OAuth クライアントに本番のリダイレクトURI
+      `https://mindmap.activefactor.org/api/auth/google/callback` を追加し、本番`.env`の
+      `GOOGLE_REDIRECT_URI` / `APP_URL` を本番URLに切り替える（Step 3 参照）
+- [ ] **ブランチ戦略を `docs/開発標準ルール.md` §4.1 の本則に移行する**。構築期間中は
+      `main` への直接コミットを許容していたが、本番稼働の開始により本番コードと開発コードを
+      分離する必要が生じるため（同§4.1「Phase 2 構築期間中の例外」参照）
 
 **完了条件**: 本番環境（heteml）でログイン〜マップ保存〜ダウンロードの一連の操作が
 動作することを確認済みであること。
@@ -444,5 +478,6 @@ MySQL接続をすべて検証した。残るのは Google/Microsoft 開発者コ
 | 1.1 | 2026-07-29 | Step 0 に着手。heteml公式サポート情報の調査結果を反映し、一般仕様として確認できた項目にチェックを入れ、契約アカウント固有の確認が必要な項目を明確化した。§0共通ルールのdevlog置き場所の記載を開発標準ルール.md §2.1と整合させた |
 | 1.2 | 2026-07-31 | Step 0 をユーザー提供の実機情報（ドメイン・PHP/MySQLバージョン等）で完了。Step 1（Docker環境構築）に着手し、`server/`一式（composer.json, .env.example, Dockerfile, docker-compose.yml, ヘルスチェック用フロントコントローラ, README）を作成。実行環境にDockerが無く`docker compose up`での動作確認は開発者側での実施が必要である旨を明記 |
 | 1.3 | 2026-07-31 | ユーザー環境でDockerが利用可能になったため、`docker compose up -d --build`を実際に実行しStep 1を完了。ヘルスチェック（200 OK）・PHP拡張5種（curl/openssl/zip/pdo_mysql/mbstring）・`composer install`・MySQL 8.4接続をすべて検証済み。`composer.lock`をリポジトリに追加 |
-| 1.5 | 2026-07-31 | Step 3（認証基盤）の実装・自動テストを完了。OIDC実装方式をADR化（firebase/php-jwt＋自前フロー）し、state/PKCE/nonce・IDトークン検証・許可判定・アカウント解決・セッション/CSRF/security_stampを実装。PHPUnit 12を導入し34テストがパス。実プロバイダとのend-to-endログインのみ、開発者コンソール登録待ちで未実施 |
 | 1.4 | 2026-07-31 | Step 2（DBスキーマ実装）完了。migrations一式・自前マイグレーションランナ・seedスクリプトを作成し、Docker上のMySQLで冪等性・複合FK制約（他人のフォルダへの不正な紐付けを拒否）を実際に検証。実装時にDDLのトランザクション扱いに関する不具合と、基本設計書のアカウント解決ロジックの欠陥（初期管理者が永久にログインできない）を発見し、いずれも修正済み |
+| 1.5 | 2026-07-31 | Step 3（認証基盤）の実装・自動テストを完了。OIDC実装方式をADR化（firebase/php-jwt＋自前フロー）し、state/PKCE/nonce・IDトークン検証・許可判定・アカウント解決・セッション/CSRF/security_stampを実装。PHPUnit 12を導入し34テストがパス。実プロバイダとのend-to-endログインのみ、開発者コンソール登録待ちで未実施 |
+| 1.6 | 2026-08-01 | Google Cloud Console へのアプリ登録が完了し、実アカウントでのend-to-endログインを検証してStep 3を完了とした。実JWKSによる署名検証、個別メール許可での通過、identity 0件の既存ユーザー（初期管理者）の初回ログイン紐付け、監査ログ記録、`/api/auth/me` によるセッション維持を確認。Microsoft のアプリ登録はユーザー判断により当面見送りとし、その旨をStep 1/3に明記。登録したGoogle OAuthクライアントの設定値（リダイレクトURI等）をStep 3に記録 |
